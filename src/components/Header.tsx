@@ -1,6 +1,7 @@
 'use client';
 
-import { Download, Settings, Radio } from 'lucide-react';
+import Link from 'next/link';
+import { Download, Settings, Radio, BookOpen } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -83,6 +84,18 @@ export default function Header({ onOpenSettings, onExport, hasApiKey, isRecordin
             <span className="hidden sm:inline text-xs">Export</span>
           </TooltipTrigger>
           <TooltipContent>Export session as JSON</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger render={
+            <Link href="/docs">
+              <Button variant="ghost" size="icon">
+                <BookOpen className="size-4" />
+                <span className="sr-only">Documentation</span>
+              </Button>
+            </Link>
+          }>
+          </TooltipTrigger>
+          <TooltipContent>Documentation</TooltipContent>
         </Tooltip>
         <ThemeToggle />
         <Tooltip>
