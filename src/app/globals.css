@@ -51,10 +51,10 @@
 /* Mic pulse animation */
 @keyframes mic-pulse {
   0%, 100% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+    box-shadow: 0 0 0 0 oklch(0.577 0.245 27.325 / 0.4);
   }
   50% {
-    box-shadow: 0 0 0 12px rgba(239, 68, 68, 0);
+    box-shadow: 0 0 0 12px oklch(0.577 0.245 27.325 / 0);
   }
 }
 
@@ -70,11 +70,11 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #d4d4d8;
+  background: var(--border);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #a1a1aa;
+  background: var(--muted-foreground);
 }
 
 /* Chat markdown */
@@ -82,7 +82,14 @@
   margin-left: 1rem;
 }
 .chat-markdown li::marker {
-  color: #a1a1aa;
+  color: var(--muted-foreground);
+}
+.chat-markdown h3,
+.chat-markdown h4 {
+  color: var(--foreground);
+}
+.chat-markdown code {
+  background: var(--muted);
 }
 
 :root {

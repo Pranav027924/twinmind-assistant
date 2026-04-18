@@ -1,6 +1,9 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { Mic, Square } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
 import type { TranscriptChunk } from '@/types';
 
 interface TranscriptPanelProps {
@@ -12,8 +15,11 @@ interface TranscriptPanelProps {
 }
 
 function formatTime(ts: number): string {
-  const d = new Date(ts);
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return new Date(ts).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
 }
 
 export default function TranscriptPanel({
@@ -33,62 +39,53 @@ export default function TranscriptPanel({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200">
-        <h2 className="text-sm font-semibold text-zinc-700 uppercase tracking-wide">Transcript</h2>
+      <div className="flex items-center justify-between px-4 py-3">
+        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
+          Transcript
+        </h2>
         {isTranscribing && (
-          <span className="text-xs text-indigo-600 animate-pulse">Transcribing...</span>
+          <span className="text-xs text-primary animate-pulse font-medium">Transcribing...</span>
         )}
       </div>
+      <Separator />
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
         {chunks.length === 0 && !isRecording && (
-          <div className="flex flex-col items-center justify-center h-full text-zinc-400 text-sm text-center gap-2 py-12">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-zinc-300">
-              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-              <line x1="12" y1="19" x2="12" y2="22" />
-            </svg>
+          <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm text-center gap-3 py-12">
+            <div className="size-12 rounded-full bg-muted flex items-center justify-center">
+              <Mic className="size-5 text-muted-foreground/60" />
+            </div>
             <p>Click the mic button to start recording</p>
           </div>
         )}
         {chunks.length === 0 && isRecording && (
-          <div className="flex items-center justify-center h-full text-zinc-400 text-sm animate-pulse">
-            Listening...
+          <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm gap-3 py-12">
+            <div className="size-3 rounded-full bg-red-500 animate-pulse" />
+            <p>Listening...</p>
           </div>
         )}
         {chunks.map((chunk) => (
-          <div key={chunk.id} className="group">
-            <span className="text-xs text-zinc-400 font-mono">{formatTime(chunk.timestamp)}</span>
-            <p className="text-sm text-zinc-800 leading-relaxed mt-0.5">{chunk.text}</p>
+          <div key={chunk.id}>
+            <span className="text-[11px] text-muted-foreground/70 font-mono tabular-nums">
+              {formatTime(chunk.timestamp)}
+            </span>
+            <p className="text-sm leading-relaxed text-foreground mt-0.5">{chunk.text}</p>
           </div>
         ))}
       </div>
 
-      <div className="flex items-center justify-center py-4 border-t border-zinc-200">
-        <button
+      <Separator />
+      <div className="flex items-center justify-center py-4">
+        <Button
           onClick={onToggleRecording}
           disabled={!hasApiKey}
-          className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${
-            !hasApiKey
-              ? 'bg-zinc-200 text-zinc-400 cursor-not-allowed'
-              : isRecording
-                ? 'bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-200 mic-pulse'
-                : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200'
-          }`}
+          size="lg"
+          variant={isRecording ? 'destructive' : 'default'}
+          className={`rounded-full size-14 ${isRecording ? 'mic-pulse' : ''}`}
           title={!hasApiKey ? 'Set API key first' : isRecording ? 'Stop recording' : 'Start recording'}
         >
-          {isRecording ? (
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <rect x="6" y="6" width="12" height="12" rx="2" />
-            </svg>
-          ) : (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-              <line x1="12" y1="19" x2="12" y2="22" />
-            </svg>
-          )}
-        </button>
+          {isRecording ? <Square className="size-5" /> : <Mic className="size-5" />}
+        </Button>
       </div>
     </div>
   );

@@ -373,7 +373,7 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="flex flex-col h-screen bg-zinc-50">
+    <div className="flex flex-col h-dvh bg-background">
       <Header
         onOpenSettings={() => setShowSettings(true)}
         onExport={handleExport}
@@ -381,7 +381,7 @@ export default function Home() {
       />
 
       <main className="flex flex-1 overflow-hidden">
-        <div className="w-[30%] border-r border-zinc-200 bg-white">
+        <div className="w-[30%] border-r border-border bg-background">
           <TranscriptPanel
             chunks={chunks}
             isRecording={isRecording}
@@ -390,7 +390,7 @@ export default function Home() {
             hasApiKey={!!settings.groqApiKey}
           />
         </div>
-        <div className="w-[35%] border-r border-zinc-200 bg-white">
+        <div className="w-[35%] border-r border-border bg-background">
           <SuggestionsPanel
             batches={batches}
             isLoading={isGeneratingSuggestions}
@@ -399,7 +399,7 @@ export default function Home() {
             isRecording={isRecording}
           />
         </div>
-        <div className="w-[35%] bg-white">
+        <div className="w-[35%] bg-background">
           <ChatPanel
             messages={messages}
             onSendMessage={handleSendMessage}
@@ -408,13 +408,12 @@ export default function Home() {
         </div>
       </main>
 
-      {showSettings && (
-        <SettingsModal
-          settings={settings}
-          onSave={handleSettingsSave}
-          onClose={() => setShowSettings(false)}
-        />
-      )}
+      <SettingsModal
+        open={showSettings}
+        settings={settings}
+        onSave={handleSettingsSave}
+        onClose={() => setShowSettings(false)}
+      />
     </div>
   );
 }
