@@ -1,65 +1,420 @@
-import Image from "next/image";
+'use client';
+
+import { useState, useCallback, useRef, useEffect } from 'react';
+import type { TranscriptChunk, Suggestion, SuggestionBatch, ChatMessage, AppSettings } from '@/types';
+import { DEFAULT_SETTINGS } from '@/lib/constants';
+import { useAudioRecorder } from '@/hooks/useAudioRecorder';
+import Header from '@/components/Header';
+import TranscriptPanel from '@/components/TranscriptPanel';
+import SuggestionsPanel from '@/components/SuggestionsPanel';
+import ChatPanel from '@/components/ChatPanel';
+import SettingsModal from '@/components/SettingsModal';
+
+function generateId(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function loadSettings(): AppSettings {
+  if (typeof window === 'undefined') return DEFAULT_SETTINGS;
+  try {
+    const stored = localStorage.getItem('twinmind-settings');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      return { ...DEFAULT_SETTINGS, ...parsed };
+    }
+  } catch {}
+  return DEFAULT_SETTINGS;
+}
+
+function saveSettings(settings: AppSettings) {
+  try {
+    localStorage.setItem('twinmind-settings', JSON.stringify(settings));
+  } catch {}
+}
 
 export default function Home() {
+  const [settings, setSettings] = useState<AppSettings>(loadSettings);
+  const [showSettings, setShowSettings] = useState(false);
+  const [chunks, setChunks] = useState<TranscriptChunk[]>([]);
+  const [batches, setBatches] = useState<SuggestionBatch[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false);
+  const [isChatResponding, setIsChatResponding] = useState(false);
+
+  const chunksRef = useRef<TranscriptChunk[]>([]);
+  const settingsRef = useRef<AppSettings>(settings);
+
+  useEffect(() => {
+    chunksRef.current = chunks;
+  }, [chunks]);
+
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
+
+  const getTranscriptText = useCallback((chunkList: TranscriptChunk[], maxChunks?: number): string => {
+    const sliced = maxChunks && maxChunks > 0 ? chunkList.slice(-maxChunks) : chunkList;
+    return sliced.map((c) => c.text).join('\n\n');
+  }, []);
+
+  const transcribeAudio = useCallback(async (blob: Blob): Promise<string | null> => {
+    const s = settingsRef.current;
+    if (!s.groqApiKey) return null;
+
+    const formData = new FormData();
+    formData.append('file', blob, 'audio.webm');
+
+    try {
+      const res = await fetch('/api/transcribe', {
+        method: 'POST',
+        headers: { 'x-groq-api-key': s.groqApiKey },
+        body: formData,
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        console.error('Transcription error:', err.error);
+        return null;
+      }
+      const data = await res.json();
+      return data.text || null;
+    } catch (err) {
+      console.error('Transcription failed:', err);
+      return null;
+    }
+  }, []);
+
+  const generateSuggestions = useCallback(async (allChunks: TranscriptChunk[]) => {
+    const s = settingsRef.current;
+    if (!s.groqApiKey || allChunks.length === 0) return;
+
+    const transcript = getTranscriptText(allChunks, s.suggestionContextChunks);
+    if (!transcript.trim()) return;
+
+    setIsGeneratingSuggestions(true);
+    try {
+      const res = await fetch('/api/suggestions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-groq-api-key': s.groqApiKey,
+        },
+        body: JSON.stringify({
+          transcript,
+          systemPrompt: s.suggestionPrompt,
+        }),
+      });
+
+      if (!res.ok) {
+        console.error('Suggestions error:', await res.text());
+        return;
+      }
+
+      const data = await res.json();
+      const suggestions: Suggestion[] = (data.suggestions || []).map((sg: Omit<Suggestion, 'id'>) => ({
+        ...sg,
+        id: generateId(),
+      }));
+
+      if (suggestions.length > 0) {
+        const batch: SuggestionBatch = {
+          id: generateId(),
+          suggestions,
+          timestamp: Date.now(),
+        };
+        setBatches((prev) => [batch, ...prev]);
+      }
+    } catch (err) {
+      console.error('Suggestions failed:', err);
+    } finally {
+      setIsGeneratingSuggestions(false);
+    }
+  }, [getTranscriptText]);
+
+  const handleAudioChunk = useCallback(async (blob: Blob) => {
+    setIsTranscribing(true);
+    const text = await transcribeAudio(blob);
+    setIsTranscribing(false);
+
+    if (text && text.trim()) {
+      const newChunk: TranscriptChunk = {
+        id: generateId(),
+        text: text.trim(),
+        timestamp: Date.now(),
+      };
+      const updatedChunks = [...chunksRef.current, newChunk];
+      setChunks(updatedChunks);
+      chunksRef.current = updatedChunks;
+      generateSuggestions(updatedChunks);
+    }
+  }, [transcribeAudio, generateSuggestions]);
+
+  const { isRecording, start, stop, flush } = useAudioRecorder(
+    handleAudioChunk,
+    settings.refreshIntervalSeconds * 1000
+  );
+
+  const handleToggleRecording = useCallback(async () => {
+    if (isRecording) {
+      stop();
+    } else {
+      try {
+        await start();
+      } catch {
+        alert('Could not access microphone. Please allow microphone access and try again.');
+      }
+    }
+  }, [isRecording, start, stop]);
+
+  const handleManualRefresh = useCallback(async () => {
+    if (!isRecording) return;
+    await flush();
+  }, [isRecording, flush]);
+
+  const streamChatResponse = useCallback(async (
+    chatMessages: { role: string; content: string }[],
+    systemPrompt: string,
+    transcript: string,
+    messageId: string,
+  ) => {
+    const s = settingsRef.current;
+    setIsChatResponding(true);
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-groq-api-key': s.groqApiKey,
+        },
+        body: JSON.stringify({
+          messages: chatMessages,
+          systemPrompt,
+          transcript,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === messageId
+              ? { ...m, content: `Error: ${err.error || 'Failed to get response'}`, isStreaming: false }
+              : m
+          )
+        );
+        return;
+      }
+
+      const reader = res.body?.getReader();
+      if (!reader) return;
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let fullContent = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || !trimmed.startsWith('data: ')) continue;
+          const data = trimmed.slice(6);
+          if (data === '[DONE]') continue;
+
+          try {
+            const parsed = JSON.parse(data);
+            const delta = parsed.choices?.[0]?.delta?.content;
+            if (delta) {
+              fullContent += delta;
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === messageId ? { ...m, content: fullContent, isStreaming: true } : m
+                )
+              );
+            }
+          } catch {}
+        }
+      }
+
+      setMessages((prev) =>
+        prev.map((m) => (m.id === messageId ? { ...m, isStreaming: false } : m))
+      );
+    } catch (err) {
+      console.error('Chat stream error:', err);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId
+            ? { ...m, content: 'Error: Failed to connect to the AI service.', isStreaming: false }
+            : m
+        )
+      );
+    } finally {
+      setIsChatResponding(false);
+    }
+  }, []);
+
+  const handleSuggestionClick = useCallback((suggestion: Suggestion) => {
+    const s = settingsRef.current;
+    if (!s.groqApiKey) {
+      alert('Please set your Groq API key in Settings first.');
+      return;
+    }
+
+    const userContent = `${suggestion.title}\n${suggestion.preview}`;
+    const userMsg: ChatMessage = {
+      id: generateId(),
+      role: 'user',
+      content: userContent,
+      timestamp: Date.now(),
+    };
+
+    const assistantId = generateId();
+    const assistantMsg: ChatMessage = {
+      id: assistantId,
+      role: 'assistant',
+      content: '',
+      timestamp: Date.now(),
+      isStreaming: true,
+    };
+
+    setMessages((prev) => [...prev, userMsg, assistantMsg]);
+
+    const maxChunks = s.detailedAnswerContextChunks || undefined;
+    const transcript = getTranscriptText(chunksRef.current, maxChunks);
+
+    const apiMessages = [
+      {
+        role: 'user',
+        content: `I clicked on this suggestion during our meeting. Please provide a detailed, helpful response.\n\nSuggestion type: ${suggestion.type}\nTitle: ${suggestion.title}\nPreview: ${suggestion.preview}`,
+      },
+    ];
+
+    streamChatResponse(apiMessages, s.detailedAnswerPrompt, transcript, assistantId);
+  }, [getTranscriptText, streamChatResponse]);
+
+  const handleSendMessage = useCallback((content: string) => {
+    const s = settingsRef.current;
+    if (!s.groqApiKey) {
+      alert('Please set your Groq API key in Settings first.');
+      return;
+    }
+
+    const userMsg: ChatMessage = {
+      id: generateId(),
+      role: 'user',
+      content,
+      timestamp: Date.now(),
+    };
+
+    const assistantId = generateId();
+    const assistantMsg: ChatMessage = {
+      id: assistantId,
+      role: 'assistant',
+      content: '',
+      timestamp: Date.now(),
+      isStreaming: true,
+    };
+
+    setMessages((prev) => {
+      const updated = [...prev, userMsg, assistantMsg];
+      const apiMessages = updated
+        .filter((m) => !m.isStreaming || m.content)
+        .map((m) => ({ role: m.role, content: m.content }))
+        .slice(0, -1);
+
+      const maxChunks = s.detailedAnswerContextChunks || undefined;
+      const transcript = getTranscriptText(chunksRef.current, maxChunks);
+      streamChatResponse(apiMessages, s.chatPrompt, transcript, assistantId);
+
+      return updated;
+    });
+  }, [getTranscriptText, streamChatResponse]);
+
+  const handleExport = useCallback(() => {
+    const exportData = {
+      exportedAt: new Date().toISOString(),
+      transcript: chunks.map((c) => ({
+        text: c.text,
+        timestamp: new Date(c.timestamp).toISOString(),
+      })),
+      suggestions: batches.map((b) => ({
+        timestamp: new Date(b.timestamp).toISOString(),
+        suggestions: b.suggestions.map((s) => ({
+          type: s.type,
+          title: s.title,
+          preview: s.preview,
+        })),
+      })),
+      chat: messages.map((m) => ({
+        role: m.role,
+        content: m.content,
+        timestamp: new Date(m.timestamp).toISOString(),
+      })),
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `twinmind-session-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [chunks, batches, messages]);
+
+  const handleSettingsSave = useCallback((newSettings: AppSettings) => {
+    setSettings(newSettings);
+    saveSettings(newSettings);
+  }, []);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="flex flex-col h-screen bg-zinc-50">
+      <Header
+        onOpenSettings={() => setShowSettings(true)}
+        onExport={handleExport}
+        hasApiKey={!!settings.groqApiKey}
+      />
+
+      <main className="flex flex-1 overflow-hidden">
+        <div className="w-[30%] border-r border-zinc-200 bg-white">
+          <TranscriptPanel
+            chunks={chunks}
+            isRecording={isRecording}
+            isTranscribing={isTranscribing}
+            onToggleRecording={handleToggleRecording}
+            hasApiKey={!!settings.groqApiKey}
+          />
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        <div className="w-[35%] border-r border-zinc-200 bg-white">
+          <SuggestionsPanel
+            batches={batches}
+            isLoading={isGeneratingSuggestions}
+            onSuggestionClick={handleSuggestionClick}
+            onRefresh={handleManualRefresh}
+            isRecording={isRecording}
+          />
+        </div>
+        <div className="w-[35%] bg-white">
+          <ChatPanel
+            messages={messages}
+            onSendMessage={handleSendMessage}
+            isResponding={isChatResponding}
+          />
         </div>
       </main>
+
+      {showSettings && (
+        <SettingsModal
+          settings={settings}
+          onSave={handleSettingsSave}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
     </div>
   );
 }

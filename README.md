@@ -1,36 +1,85 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TwinMind - Live Meeting Suggestions
 
-## Getting Started
+An AI-powered meeting copilot that listens to live audio, transcribes in real time, and surfaces actionable suggestions based on what is being discussed.
 
-First, run the development server:
+## Stack
+
+- **Framework**: Next.js 16 (App Router, TypeScript)
+- **Styling**: Tailwind CSS 4
+- **Transcription**: Groq Whisper Large V3
+- **LLM**: Groq GPT-OSS 120B (OpenAI open-weight model)
+- **Deployment**: Vercel
+
+## Setup
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) and paste your Groq API key in Settings.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Get a free API key at [console.groq.com](https://console.groq.com).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Architecture
 
-## Learn More
+```
+src/
+  app/
+    page.tsx              # Main 3-column layout + state orchestration
+    api/
+      transcribe/         # Proxies audio to Groq Whisper
+      suggestions/        # Generates 3 suggestions per batch
+      chat/               # Streams detailed answers and chat
+  components/
+    TranscriptPanel.tsx   # Mic button + live transcript
+    SuggestionsPanel.tsx  # Suggestion batches with refresh
+    SuggestionCard.tsx    # Individual suggestion card
+    ChatPanel.tsx         # Chat with streaming responses
+    SettingsModal.tsx     # API key + prompt editing
+    Header.tsx            # Navigation bar
+  hooks/
+    useAudioRecorder.ts   # MediaRecorder-based audio chunking
+  lib/
+    prompts.ts            # Default system prompts
+    constants.ts          # Model names, defaults
+  types/
+    index.ts              # TypeScript interfaces
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Prompt Strategy
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Live Suggestions
+The suggestion prompt instructs the model to analyze conversation flow and produce a **mix of 5 suggestion types**:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Type | When it's used |
+|------|---------------|
+| `question_to_ask` | Conversation is exploratory or a follow-up would help |
+| `talking_point` | A new angle, data point, or counterpoint would add value |
+| `answer` | Someone just asked a question |
+| `fact_check` | A specific claim, number, or name was mentioned |
+| `clarification` | A technical term, acronym, or ambiguous statement came up |
 
-## Deploy on Vercel
+The prompt includes **decision rules** that tell the model when to pick each type, so the mix adapts to what's happening in the conversation. Each suggestion's preview text is designed to deliver standalone value without clicking.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Context Windows
+- **Suggestions**: Last 6 chunks (~3 minutes) by default. Focused context produces more relevant suggestions than sending the entire transcript.
+- **Detailed answers**: Full transcript. When a user clicks for detail, they want comprehensive, grounded information.
+- **Chat**: Full transcript. Enables referencing anything discussed.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+All context windows are configurable in Settings.
+
+### Detailed Answers
+Uses a separate prompt optimized for structured, scannable output (bullets, bold, headers). Tailored based on suggestion type — fact-checks include confidence levels, answers include takeaways, talking points include supporting evidence.
+
+## Tradeoffs
+
+1. **API routes as proxy** vs direct client calls: Added ~10ms latency but avoids CORS issues and keeps the architecture clean. The API key is passed per-request in headers, never stored server-side.
+
+2. **Stop/start recording** every 30s vs continuous with `requestData()`: Stop/start creates a valid audio file each time. The ~5ms gap between sessions is negligible. `requestData()` chunks may lack proper headers for Whisper.
+
+3. **No state management library**: React useState + useCallback is sufficient for this scope. Adding Redux or Zustand would be over-engineering.
+
+4. **JSON response format** for suggestions: Using `response_format: { type: "json_object" }` ensures reliable parsing vs hoping for valid JSON in free-form output.
+
+5. **Client-side settings in localStorage**: API key persists across reloads for UX. Session data (transcript, suggestions, chat) is ephemeral as specified.
