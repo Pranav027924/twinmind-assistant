@@ -1,13 +1,14 @@
 'use client';
 
-import { HelpCircle, Lightbulb, ArrowRight, CheckCircle, Info } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
+import { HelpCircle, Lightbulb, ArrowRight, CheckCircle2, Info } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
 import type { Suggestion } from '@/types';
 
 interface SuggestionCardProps {
   suggestion: Suggestion;
   onClick: (suggestion: Suggestion) => void;
+  index: number;
 }
 
 const TYPE_CONFIG: Record<
@@ -15,60 +16,86 @@ const TYPE_CONFIG: Record<
   {
     label: string;
     icon: React.ElementType;
+    gradient: string;
     badgeClass: string;
-    cardClass: string;
+    borderAccent: string;
   }
 > = {
   question_to_ask: {
     label: 'Question',
     icon: HelpCircle,
-    badgeClass: 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300',
-    cardClass: 'hover:border-blue-300 dark:hover:border-blue-800',
+    gradient: 'from-blue-500/10 via-transparent to-transparent',
+    badgeClass: 'bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400 border-blue-200 dark:border-blue-800',
+    borderAccent: 'group-hover:border-blue-300 dark:group-hover:border-blue-700',
   },
   talking_point: {
     label: 'Talking Point',
     icon: Lightbulb,
-    badgeClass: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300',
-    cardClass: 'hover:border-emerald-300 dark:hover:border-emerald-800',
+    gradient: 'from-emerald-500/10 via-transparent to-transparent',
+    badgeClass: 'bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800',
+    borderAccent: 'group-hover:border-emerald-300 dark:group-hover:border-emerald-700',
   },
   answer: {
     label: 'Answer',
     icon: ArrowRight,
-    badgeClass: 'bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300',
-    cardClass: 'hover:border-violet-300 dark:hover:border-violet-800',
+    gradient: 'from-violet-500/10 via-transparent to-transparent',
+    badgeClass: 'bg-violet-500/10 text-violet-600 dark:bg-violet-500/20 dark:text-violet-400 border-violet-200 dark:border-violet-800',
+    borderAccent: 'group-hover:border-violet-300 dark:group-hover:border-violet-700',
   },
   fact_check: {
     label: 'Fact Check',
-    icon: CheckCircle,
-    badgeClass: 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300',
-    cardClass: 'hover:border-amber-300 dark:hover:border-amber-800',
+    icon: CheckCircle2,
+    gradient: 'from-amber-500/10 via-transparent to-transparent',
+    badgeClass: 'bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 border-amber-200 dark:border-amber-800',
+    borderAccent: 'group-hover:border-amber-300 dark:group-hover:border-amber-700',
   },
   clarification: {
-    label: 'Clarification',
+    label: 'Clarify',
     icon: Info,
-    badgeClass: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-300',
-    cardClass: 'hover:border-cyan-300 dark:hover:border-cyan-800',
+    gradient: 'from-cyan-500/10 via-transparent to-transparent',
+    badgeClass: 'bg-cyan-500/10 text-cyan-600 dark:bg-cyan-500/20 dark:text-cyan-400 border-cyan-200 dark:border-cyan-800',
+    borderAccent: 'group-hover:border-cyan-300 dark:group-hover:border-cyan-700',
   },
 };
 
-export default function SuggestionCard({ suggestion, onClick }: SuggestionCardProps) {
+export default function SuggestionCard({ suggestion, onClick, index }: SuggestionCardProps) {
   const config = TYPE_CONFIG[suggestion.type] || TYPE_CONFIG.talking_point;
   const Icon = config.icon;
 
   return (
-    <Card
-      size="sm"
-      className={`cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5 ${config.cardClass}`}
-      onClick={() => onClick(suggestion)}
+    <motion.div
+      initial={{ opacity: 0, y: 16, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{
+        duration: 0.35,
+        delay: index * 0.08,
+        ease: [0.21, 0.47, 0.32, 0.98],
+      }}
     >
-      <CardContent className="space-y-1.5">
-        <Badge variant="secondary" className={`text-[10px] gap-1 ${config.badgeClass}`}>
-          <Icon className="size-3" />
-          {config.label}
-        </Badge>
-        <h3 className="text-sm font-semibold leading-snug">{suggestion.title}</h3>
-        <p className="text-xs text-muted-foreground leading-relaxed">{suggestion.preview}</p>
-      </CardContent>
-    </Card>
+      <button
+        onClick={() => onClick(suggestion)}
+        className={`group w-full text-left rounded-xl border bg-card p-3.5 transition-all duration-200
+          hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-0.5
+          active:translate-y-0 active:shadow-md
+          suggestion-glow ${config.borderAccent}`}
+      >
+        <div className={`absolute inset-0 rounded-xl bg-gradient-to-br ${config.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none`} />
+        <div className="relative space-y-2">
+          <div className="flex items-center justify-between">
+            <Badge variant="outline" className={`text-[10px] gap-1 py-0 ${config.badgeClass}`}>
+              <Icon className="size-2.5" />
+              {config.label}
+            </Badge>
+            <ArrowRight className="size-3 text-muted-foreground/40 group-hover:text-foreground/60 group-hover:translate-x-0.5 transition-all duration-200" />
+          </div>
+          <h3 className="text-[13px] font-semibold leading-snug text-foreground group-hover:text-foreground">
+            {suggestion.title}
+          </h3>
+          <p className="text-[12px] text-muted-foreground leading-relaxed">
+            {suggestion.preview}
+          </p>
+        </div>
+      </button>
+    </motion.div>
   );
 }

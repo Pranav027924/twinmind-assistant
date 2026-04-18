@@ -4,11 +4,17 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import type { TranscriptChunk, Suggestion, SuggestionBatch, ChatMessage, AppSettings } from '@/types';
 import { DEFAULT_SETTINGS } from '@/lib/constants';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
+import {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
+} from '@/components/ui/resizable';
 import Header from '@/components/Header';
 import TranscriptPanel from '@/components/TranscriptPanel';
 import SuggestionsPanel from '@/components/SuggestionsPanel';
 import ChatPanel from '@/components/ChatPanel';
 import SettingsModal from '@/components/SettingsModal';
+import { toast } from 'sonner';
 
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -73,13 +79,14 @@ export default function Home() {
       });
       if (!res.ok) {
         const err = await res.json();
-        console.error('Transcription error:', err.error);
+        toast.error('Transcription failed', { description: err.error });
         return null;
       }
       const data = await res.json();
       return data.text || null;
     } catch (err) {
       console.error('Transcription failed:', err);
+      toast.error('Transcription failed', { description: 'Network error' });
       return null;
     }
   }, []);
@@ -106,7 +113,8 @@ export default function Home() {
       });
 
       if (!res.ok) {
-        console.error('Suggestions error:', await res.text());
+        const errText = await res.text();
+        toast.error('Suggestions failed', { description: errText.slice(0, 100) });
         return;
       }
 
@@ -126,6 +134,7 @@ export default function Home() {
       }
     } catch (err) {
       console.error('Suggestions failed:', err);
+      toast.error('Failed to generate suggestions');
     } finally {
       setIsGeneratingSuggestions(false);
     }
@@ -157,11 +166,15 @@ export default function Home() {
   const handleToggleRecording = useCallback(async () => {
     if (isRecording) {
       stop();
+      toast.info('Recording stopped');
     } else {
       try {
         await start();
+        toast.success('Recording started');
       } catch {
-        alert('Could not access microphone. Please allow microphone access and try again.');
+        toast.error('Microphone access denied', {
+          description: 'Please allow microphone access in your browser settings.',
+        });
       }
     }
   }, [isRecording, start, stop]);
@@ -262,7 +275,7 @@ export default function Home() {
   const handleSuggestionClick = useCallback((suggestion: Suggestion) => {
     const s = settingsRef.current;
     if (!s.groqApiKey) {
-      alert('Please set your Groq API key in Settings first.');
+      toast.error('API key required', { description: 'Set your Groq API key in Settings.' });
       return;
     }
 
@@ -301,7 +314,7 @@ export default function Home() {
   const handleSendMessage = useCallback((content: string) => {
     const s = settingsRef.current;
     if (!s.groqApiKey) {
-      alert('Please set your Groq API key in Settings first.');
+      toast.error('API key required', { description: 'Set your Groq API key in Settings.' });
       return;
     }
 
@@ -365,11 +378,13 @@ export default function Home() {
     a.download = `twinmind-session-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    toast.success('Session exported');
   }, [chunks, batches, messages]);
 
   const handleSettingsSave = useCallback((newSettings: AppSettings) => {
     setSettings(newSettings);
     saveSettings(newSettings);
+    toast.success('Settings saved');
   }, []);
 
   return (
@@ -378,34 +393,43 @@ export default function Home() {
         onOpenSettings={() => setShowSettings(true)}
         onExport={handleExport}
         hasApiKey={!!settings.groqApiKey}
+        isRecording={isRecording}
       />
 
-      <main className="flex flex-1 overflow-hidden">
-        <div className="w-[30%] border-r border-border bg-background">
-          <TranscriptPanel
-            chunks={chunks}
-            isRecording={isRecording}
-            isTranscribing={isTranscribing}
-            onToggleRecording={handleToggleRecording}
-            hasApiKey={!!settings.groqApiKey}
-          />
-        </div>
-        <div className="w-[35%] border-r border-border bg-background">
-          <SuggestionsPanel
-            batches={batches}
-            isLoading={isGeneratingSuggestions}
-            onSuggestionClick={handleSuggestionClick}
-            onRefresh={handleManualRefresh}
-            isRecording={isRecording}
-          />
-        </div>
-        <div className="w-[35%] bg-background">
-          <ChatPanel
-            messages={messages}
-            onSendMessage={handleSendMessage}
-            isResponding={isChatResponding}
-          />
-        </div>
+      <main className="flex-1 overflow-hidden">
+        <ResizablePanelGroup orientation="horizontal" className="h-full">
+          <ResizablePanel defaultSize="28%" minSize="20%" maxSize="40%">
+            <TranscriptPanel
+              chunks={chunks}
+              isRecording={isRecording}
+              isTranscribing={isTranscribing}
+              onToggleRecording={handleToggleRecording}
+              hasApiKey={!!settings.groqApiKey}
+            />
+          </ResizablePanel>
+
+          <ResizableHandle withHandle />
+
+          <ResizablePanel defaultSize="36%" minSize="25%">
+            <SuggestionsPanel
+              batches={batches}
+              isLoading={isGeneratingSuggestions}
+              onSuggestionClick={handleSuggestionClick}
+              onRefresh={handleManualRefresh}
+              isRecording={isRecording}
+            />
+          </ResizablePanel>
+
+          <ResizableHandle withHandle />
+
+          <ResizablePanel defaultSize="36%" minSize="25%">
+            <ChatPanel
+              messages={messages}
+              onSendMessage={handleSendMessage}
+              isResponding={isChatResponding}
+            />
+          </ResizablePanel>
+        </ResizablePanelGroup>
       </main>
 
       <SettingsModal
