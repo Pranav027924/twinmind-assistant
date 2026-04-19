@@ -127,17 +127,39 @@ export default function Home() {
     const text = await transcribeAudio(blob);
     setIsTranscribing(false);
 
-    if (text && text.trim()) {
-      const newChunk: TranscriptChunk = {
-        id: generateId(),
-        text: text.trim(),
-        timestamp: Date.now(),
-      };
-      const updatedChunks = [...chunksRef.current, newChunk];
-      setChunks(updatedChunks);
-      chunksRef.current = updatedChunks;
-      generateSuggestions(updatedChunks);
+    if (!text) return;
+
+    const trimmed = text.trim();
+
+    // Whisper hallucinates these phrases on silence/noise — skip them
+    const HALLUCINATION_PATTERNS = [
+      /^thank you\.?$/i,
+      /^thanks\.?$/i,
+      /^you$/i,
+      /^bye\.?$/i,
+      /^goodbye\.?$/i,
+      /^okay\.?$/i,
+      /^the end\.?$/i,
+      /^music$/i,
+      /^applause$/i,
+      /^\.+$/,
+      /^\[.*\]$/,
+      /^\(.*\)$/,
+    ];
+
+    if (!trimmed || trimmed.length < 5 || HALLUCINATION_PATTERNS.some((p) => p.test(trimmed))) {
+      return;
     }
+
+    const newChunk: TranscriptChunk = {
+      id: generateId(),
+      text: trimmed,
+      timestamp: Date.now(),
+    };
+    const updatedChunks = [...chunksRef.current, newChunk];
+    setChunks(updatedChunks);
+    chunksRef.current = updatedChunks;
+    generateSuggestions(updatedChunks);
   }, [transcribeAudio, generateSuggestions]);
 
   const { isRecording, start, stop, flush } = useAudioRecorder(
