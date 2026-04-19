@@ -316,20 +316,20 @@ export default function Home() {
       isStreaming: true,
     };
 
-    setMessages((prev) => {
-      const updated = [...prev, userMsg, assistantMsg];
-      const apiMessages = updated
-        .filter((m) => !m.isStreaming || m.content)
-        .map((m) => ({ role: m.role, content: m.content }))
-        .slice(0, -1);
+    const prevMessages = [...messages];
+    setMessages((prev) => [...prev, userMsg, assistantMsg]);
 
-      const maxChunks = s.detailedAnswerContextChunks || undefined;
-      const transcript = getTranscriptText(chunksRef.current, maxChunks);
-      streamChatResponse(apiMessages, s.chatPrompt, transcript, assistantId);
+    const apiMessages = [
+      ...prevMessages
+        .filter((m) => !m.isStreaming && m.content)
+        .map((m) => ({ role: m.role, content: m.content })),
+      { role: 'user', content },
+    ];
 
-      return updated;
-    });
-  }, [getTranscriptText, streamChatResponse]);
+    const maxChunks = s.detailedAnswerContextChunks || undefined;
+    const transcript = getTranscriptText(chunksRef.current, maxChunks);
+    streamChatResponse(apiMessages, s.chatPrompt, transcript, assistantId);
+  }, [messages, getTranscriptText, streamChatResponse]);
 
   const handleExport = useCallback(() => {
     const exportData = {

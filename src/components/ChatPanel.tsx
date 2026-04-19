@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback, memo } from 'react';
 import { Send, MessageSquare, Bot, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
@@ -33,6 +33,20 @@ function TypingIndicator() {
   );
 }
 
+const StreamingText = memo(function StreamingText({ content }: { content: string }) {
+  return (
+    <div className="prose-chat text-foreground whitespace-pre-wrap">{content}</div>
+  );
+});
+
+const RenderedMarkdown = memo(function RenderedMarkdown({ content }: { content: string }) {
+  return (
+    <div className="prose-chat text-foreground">
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+    </div>
+  );
+});
+
 function ChatBubble({ msg }: { msg: ChatMessage }) {
   const isUser = msg.role === 'user';
   const isEmptyStreaming = msg.isStreaming && !msg.content;
@@ -64,10 +78,10 @@ function ChatBubble({ msg }: { msg: ChatMessage }) {
             <div className="leading-relaxed whitespace-pre-wrap">{msg.content}</div>
           ) : isEmptyStreaming ? (
             <TypingIndicator />
+          ) : msg.isStreaming ? (
+            <StreamingText content={msg.content} />
           ) : (
-            <div className={cn('prose-chat', isUser ? '' : 'text-foreground')}>
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content || ''}</ReactMarkdown>
-            </div>
+            <RenderedMarkdown content={msg.content} />
           )}
         </div>
         <div
@@ -92,13 +106,22 @@ export default function ChatPanel({ messages, onSendMessage, isResponding }: Cha
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const lastMessageContent = messages[messages.length - 1]?.content;
+  const rafRef = useRef<number | null>(null);
+
+  const lastMsg = messages[messages.length - 1];
+
+  const scrollToBottom = useCallback(() => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(() => {
+      if (scrollRef.current) {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      }
+    });
+  }, []);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-    }
-  }, [messages, lastMessageContent]);
+    scrollToBottom();
+  }, [messages, lastMsg?.content, scrollToBottom]);
 
   useEffect(() => {
     if (textareaRef.current) {
