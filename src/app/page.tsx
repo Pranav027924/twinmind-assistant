@@ -2,8 +2,8 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { TranscriptChunk, Suggestion, SuggestionBatch, ChatMessage, AppSettings } from '@/types';
-import { DEFAULT_SETTINGS } from '@/lib/constants';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
+import { usePersistedSettings } from '@/hooks/usePersistedSettings';
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -20,26 +20,8 @@ function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-function loadSettings(): AppSettings {
-  if (typeof window === 'undefined') return DEFAULT_SETTINGS;
-  try {
-    const stored = localStorage.getItem('twinmind-settings');
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      return { ...DEFAULT_SETTINGS, ...parsed };
-    }
-  } catch {}
-  return DEFAULT_SETTINGS;
-}
-
-function saveSettings(settings: AppSettings) {
-  try {
-    localStorage.setItem('twinmind-settings', JSON.stringify(settings));
-  } catch {}
-}
-
 export default function Home() {
-  const [settings, setSettings] = useState<AppSettings>(loadSettings);
+  const [settings, setSettings] = usePersistedSettings();
   const [showSettings, setShowSettings] = useState(false);
   const [chunks, setChunks] = useState<TranscriptChunk[]>([]);
   const [batches, setBatches] = useState<SuggestionBatch[]>([]);
@@ -383,9 +365,8 @@ export default function Home() {
 
   const handleSettingsSave = useCallback((newSettings: AppSettings) => {
     setSettings(newSettings);
-    saveSettings(newSettings);
     toast.success('Settings saved');
-  }, []);
+  }, [setSettings]);
 
   return (
     <div className="flex flex-col h-dvh bg-background">
@@ -396,7 +377,7 @@ export default function Home() {
         isRecording={isRecording}
       />
 
-      <main className="flex-1 overflow-hidden">
+      <main className="flex-1 overflow-hidden">    
         <ResizablePanelGroup orientation="horizontal" className="h-full">
           <ResizablePanel defaultSize="28%" minSize="20%" maxSize="40%">
             <TranscriptPanel
