@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { Download, Settings, Radio, BookOpen } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -20,13 +21,14 @@ export default function Header({ onOpenSettings, onExport, hasApiKey, isRecordin
   return (
     <header className="flex items-center justify-between px-5 py-2.5 border-b bg-background/80 backdrop-blur-md shrink-0">
       <div className="flex items-center gap-3">
-        <div className="relative flex items-center justify-center size-9 rounded-xl gradient-bg text-white shadow-sm">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-            <line x1="12" y1="19" x2="12" y2="22" />
-          </svg>
-        </div>
+        <Image
+          src="https://framerusercontent.com/images/2d6Z9rsGpWIVujaD9PH1CioRheY.png?scale-down-to=512"
+          alt="TwinMind"
+          width={36}
+          height={36}
+          unoptimized
+          className="size-9 rounded-xl object-cover shadow-sm"
+        />
         <div>
           <h1 className="text-base font-semibold tracking-tight gradient-text">TwinMind</h1>
         </div>
