@@ -24,14 +24,11 @@ export default function Header({ onOpenSettings, onExport, hasApiKey, isRecordin
         <Image
           src="https://framerusercontent.com/images/2d6Z9rsGpWIVujaD9PH1CioRheY.png?scale-down-to=512"
           alt="TwinMind"
-          width={36}
+          width={120}
           height={36}
           unoptimized
-          className="size-9 rounded-xl object-cover shadow-sm"
+          className="h-8 w-auto object-contain"
         />
-        <div>
-          <h1 className="text-base font-semibold tracking-tight gradient-text">TwinMind</h1>
-        </div>
 
         <Separator orientation="vertical" className="h-5 mx-1" />
 
