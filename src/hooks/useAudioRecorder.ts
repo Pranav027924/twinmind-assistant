@@ -4,6 +4,7 @@ import { useRef, useState, useCallback, useEffect } from 'react';
 
 interface UseAudioRecorderReturn {
   isRecording: boolean;
+  hasEverStarted: boolean;
   start: () => Promise<void>;
   stop: () => void;
   flush: () => Promise<void>;
@@ -13,6 +14,7 @@ export function useAudioRecorder(
   onChunkReady: (blob: Blob) => void,
   intervalMs: number
 ): UseAudioRecorderReturn {
+  const [hasEverStarted, setHasEverStarted] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -77,6 +79,7 @@ export function useAudioRecorder(
       });
       streamRef.current = stream;
       setIsRecording(true);
+      setHasEverStarted(true);
       startRecorder();
       intervalRef.current = setInterval(() => {
         flushCurrentChunk();
@@ -114,5 +117,5 @@ export function useAudioRecorder(
     await flushCurrentChunk();
   }, [flushCurrentChunk]);
 
-  return { isRecording, start, stop, flush };
+  return { isRecording, hasEverStarted, start, stop, flush };
 }

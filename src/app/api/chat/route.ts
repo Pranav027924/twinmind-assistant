@@ -1,5 +1,20 @@
 import { NextRequest } from 'next/server';
-import { GROQ_API_BASE, LLM_MODEL } from '@/lib/constants';
+import { GROQ_API_BASE, LLM_MODEL, TEMPERATURE_CHAT, TEMPERATURE_DETAILED } from '@/lib/constants';
+import { buildContextBlock } from '@/lib/prompts';
+
+export const runtime = 'nodejs';
+
+interface RequestBody {
+  messages: { role: 'user' | 'assistant'; content: string }[];
+  systemPrompt: string;
+  transcript?: string;
+  meetingType?: string;
+  userRole?: string;
+  meetingGoal?: string;
+  // When set, this request was triggered by a suggestion-card click.
+  // We use a slightly lower temperature for these (more grounded answers).
+  isDetailedAnswer?: boolean;
+}
 
 export async function POST(req: NextRequest) {
   const apiKey = req.headers.get('x-groq-api-key');
@@ -11,11 +26,24 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { messages, systemPrompt, transcript } = await req.json();
+    const body = (await req.json()) as RequestBody;
+    const {
+      messages,
+      systemPrompt,
+      transcript,
+      meetingType,
+      userRole,
+      meetingGoal,
+      isDetailedAnswer,
+    } = body;
 
-    const systemContent = transcript
-      ? `${systemPrompt}\n\n---\nFULL CONVERSATION TRANSCRIPT:\n${transcript}\n---`
-      : systemPrompt;
+    const contextBlock = buildContextBlock({ meetingType, userRole, meetingGoal });
+
+    const transcriptBlock = transcript?.trim()
+      ? `\n\n---\nCONVERSATION TRANSCRIPT (relevant window):\n${transcript.trim()}\n---`
+      : '';
+
+    const systemContent = `${contextBlock}${systemPrompt}${transcriptBlock}`;
 
     const response = await fetch(`${GROQ_API_BASE}/chat/completions`, {
       method: 'POST',
@@ -27,7 +55,7 @@ export async function POST(req: NextRequest) {
         model: LLM_MODEL,
         messages: [{ role: 'system', content: systemContent }, ...messages],
         stream: true,
-        temperature: 0.7,
+        temperature: isDetailedAnswer ? TEMPERATURE_DETAILED : TEMPERATURE_CHAT,
         max_tokens: 2048,
       }),
     });

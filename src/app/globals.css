@@ -242,65 +242,71 @@
 }
 
 /* ============================================
-   MARKDOWN RENDERING IN CHAT (enhanced)
+   ASSISTANT CHAT BUBBLE — subtle gradient border
+   ============================================ */
+.assistant-bubble {
+  background: var(--card);
+  border: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+}
+.assistant-bubble::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, color-mix(in oklab, var(--primary) 35%, transparent) 0%, transparent 50%, color-mix(in oklab, var(--gradient-mid) 25%, transparent) 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0.8;
+}
+
+/* ============================================
+   MARKDOWN RENDERING IN CHAT (high-density, scannable)
+   The prompt produces a strict 3-block structure:
+     1) **TL;DR:** … (rendered as gradient card by ChatPanel)
+     2) - **Label:** … bullets (color-rotated chips below)
+     3) > **Action/Verdict/etc:** … (callout box)
    ============================================ */
 .prose-chat {
   font-size: 0.8125rem;
-  line-height: 1.7;
+  line-height: 1.55;
   word-break: break-word;
+  color: var(--foreground);
 }
 
-/* Headings — colored accent */
-.prose-chat h1, .prose-chat h2, .prose-chat h3, .prose-chat h4 {
-  font-weight: 700;
-  margin-top: 1em;
-  margin-bottom: 0.4em;
-  line-height: 1.3;
-  color: var(--primary);
-}
-.prose-chat h1 { font-size: 1.15rem; }
-.prose-chat h2 { font-size: 1.05rem; }
-.prose-chat h3 { font-size: 0.95rem; }
-.prose-chat h4 { font-size: 0.85rem; }
-
-/* Paragraphs */
 .prose-chat p {
-  margin-bottom: 0.6em;
+  margin-bottom: 0.5em;
 }
-.prose-chat p:last-child {
-  margin-bottom: 0;
-}
+.prose-chat p:last-child { margin-bottom: 0; }
 
-/* TL;DR line — highlighted block styling.
-   The prompt produces "**TL;DR:** ..." as the first <p><strong>. */
-.prose-chat > p:first-child {
-  background: var(--primary) / 8%;
-  border-left: 3px solid var(--primary);
-  border-radius: 0 0.4em 0.4em 0;
-  padding: 0.5em 0.75em;
-  margin-bottom: 0.75em;
-  font-weight: 500;
-}
-
-/* Lists */
-.prose-chat ul, .prose-chat ol {
-  padding-left: 1.2rem;
-  margin-bottom: 0.6em;
-}
-.prose-chat ul { list-style-type: disc; }
-.prose-chat ol { list-style-type: decimal; }
-.prose-chat li {
-  margin-bottom: 0.2em;
-  padding-left: 0.15em;
-}
-.prose-chat li::marker {
-  color: var(--primary);
-}
-
-/* Bold — slightly colored */
+/* Bold (default) — clean color emphasis, no underline noise. */
 .prose-chat strong {
   font-weight: 700;
   color: var(--foreground);
+}
+
+/* Bold containing numbers → stat chip: monospace, soft primary fill. */
+.prose-chat strong[data-stat="true"] {
+  display: inline-block;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-weight: 700;
+  font-size: 0.92em;
+  color: var(--primary);
+  background: color-mix(in oklab, var(--primary) 12%, transparent);
+  border: 1px solid color-mix(in oklab, var(--primary) 22%, transparent);
+  padding: 0.05em 0.42em;
+  border-radius: 0.4em;
+  letter-spacing: 0.005em;
+  white-space: nowrap;
+}
+.dark .prose-chat strong[data-stat="true"] {
+  color: oklch(0.78 0.18 264);
+  background: color-mix(in oklab, var(--primary) 18%, transparent);
 }
 
 /* Italic */
@@ -309,22 +315,408 @@
   color: var(--muted-foreground);
 }
 
-/* Inline code — pill-shaped highlight */
+/* Inline code */
 .prose-chat code {
   font-family: var(--font-geist-mono), ui-monospace, monospace;
   font-size: 0.78em;
-  padding: 0.15em 0.45em;
+  padding: 0.12em 0.42em;
   border-radius: 0.35em;
-  background: var(--primary) / 10%;
+  background: color-mix(in oklab, var(--primary) 10%, transparent);
   color: var(--primary);
   font-weight: 500;
 }
 
-/* Code blocks */
+/* ============================================
+   BULLETS — color-rotated chips with label badge + accent rail
+   ============================================ */
+.prose-chat ul {
+  list-style: none;
+  padding-left: 0;
+  margin: 0.55em 0 0.55em;
+  display: flex;
+  flex-direction: column;
+  gap: 0.42em;
+}
+
+.prose-chat ul > li {
+  --bullet-accent: var(--primary);
+  position: relative;
+  padding: 0.5em 0.7em 0.5em 1.65em;
+  background: color-mix(in oklab, var(--bullet-accent) 6%, transparent);
+  border: 1px solid color-mix(in oklab, var(--bullet-accent) 18%, transparent);
+  border-left: 3px solid color-mix(in oklab, var(--bullet-accent) 75%, transparent);
+  border-radius: 0.55em;
+  font-size: 0.83rem;
+  line-height: 1.55;
+  color: var(--foreground);
+  transition: background 160ms ease;
+}
+
+/* Rotate accent color across up to 5 bullets per list */
+.prose-chat ul > li:nth-child(5n + 1) { --bullet-accent: oklch(0.6 0.22 264); }   /* primary blue */
+.prose-chat ul > li:nth-child(5n + 2) { --bullet-accent: oklch(0.62 0.18 150); } /* emerald */
+.prose-chat ul > li:nth-child(5n + 3) { --bullet-accent: oklch(0.7 0.2 65); }    /* amber */
+.prose-chat ul > li:nth-child(5n + 4) { --bullet-accent: oklch(0.62 0.2 285); }  /* violet */
+.prose-chat ul > li:nth-child(5n + 5) { --bullet-accent: oklch(0.65 0.18 200); } /* cyan */
+
+.dark .prose-chat ul > li:nth-child(5n + 1) { --bullet-accent: oklch(0.7 0.2 264); }
+.dark .prose-chat ul > li:nth-child(5n + 2) { --bullet-accent: oklch(0.72 0.18 150); }
+.dark .prose-chat ul > li:nth-child(5n + 3) { --bullet-accent: oklch(0.78 0.18 75); }
+.dark .prose-chat ul > li:nth-child(5n + 4) { --bullet-accent: oklch(0.72 0.18 285); }
+.dark .prose-chat ul > li:nth-child(5n + 5) { --bullet-accent: oklch(0.75 0.16 200); }
+
+/* Round dot marker, accent-colored with a soft halo */
+.prose-chat ul > li::before {
+  content: '';
+  position: absolute;
+  left: 0.6em;
+  top: 0.92em;
+  width: 0.5em;
+  height: 0.5em;
+  border-radius: 9999px;
+  background: var(--bullet-accent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--bullet-accent) 22%, transparent);
+}
+
+/* Bullet label chip — leading **Label:** strong becomes a colored pill.
+   Accent color is inherited from the parent <li>'s --bullet-accent. */
+.prose-chat ul > li > strong:first-child {
+  display: inline-block;
+  font-size: 0.66rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--bullet-accent);
+  background: color-mix(in oklab, var(--bullet-accent) 16%, transparent);
+  border: 1px solid color-mix(in oklab, var(--bullet-accent) 28%, transparent);
+  padding: 0.18em 0.55em;
+  border-radius: 0.4em;
+  margin-right: 0.5em;
+  vertical-align: 1px;
+  line-height: 1.2;
+}
+/* If the bullet's leading strong is itself a stat (rare), suppress
+   the stat-chip treatment so the label-chip wins cleanly. */
+.prose-chat ul > li > strong:first-child[data-stat="true"] {
+  font-family: inherit;
+  white-space: normal;
+}
+
+.prose-chat ol {
+  padding-left: 1.15rem;
+  margin: 0.5em 0;
+  list-style-type: decimal;
+}
+.prose-chat ol li {
+  margin-bottom: 0.25em;
+  padding-left: 0.15em;
+}
+.prose-chat ol li::marker {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+/* ============================================
+   TL;DR CARD — gradient hero card at the top of every assistant reply
+   ============================================ */
+.prose-chat .tldr-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.85rem 1rem 0.85rem 0.85rem;
+  margin: 0 0 1rem 0;
+  border-radius: 0.85rem;
+  border: 1px solid color-mix(in oklab, var(--primary) 24%, transparent);
+  background:
+    radial-gradient(circle at 0% 0%, color-mix(in oklab, var(--primary) 14%, transparent) 0%, transparent 60%),
+    linear-gradient(135deg, color-mix(in oklab, var(--primary) 12%, transparent) 0%, color-mix(in oklab, var(--gradient-mid) 6%, transparent) 100%);
+  position: relative;
+  overflow: hidden;
+}
+.prose-chat .tldr-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg, var(--primary), var(--gradient-mid));
+}
+
+.prose-chat .tldr-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.7rem;
+  height: 1.7rem;
+  margin-top: 0.1rem;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, var(--primary), var(--gradient-mid));
+  color: var(--primary-foreground);
+  box-shadow:
+    0 2px 8px -2px color-mix(in oklab, var(--primary) 55%, transparent),
+    inset 0 1px 0 color-mix(in oklab, white 25%, transparent);
+}
+
+.prose-chat .tldr-body {
+  font-size: 0.93rem;
+  line-height: 1.55;
+  color: var(--foreground);
+  font-weight: 500;
+}
+
+/* The leading "**TL;DR:**" becomes a small uppercase pill, separated from
+   the punchline by a thin divider so the card reads two-tier. */
+.prose-chat .tldr-body strong:first-child {
+  display: inline-block;
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--primary);
+  background: color-mix(in oklab, var(--primary) 14%, transparent);
+  border: 1px solid color-mix(in oklab, var(--primary) 28%, transparent);
+  padding: 0.22em 0.55em;
+  border-radius: 0.4em;
+  margin-right: 0.6em;
+  vertical-align: 1px;
+  line-height: 1.2;
+}
+
+/* TL;DR variants — driven by glyphs in the punchline (✓ ⚠ ✗ ?) */
+
+/* GOOD — emerald */
+.prose-chat .tldr-good {
+  --tldr-color: oklch(0.55 0.2 150);
+  --tldr-color-2: oklch(0.62 0.18 165);
+  border-color: color-mix(in oklab, var(--tldr-color) 38%, transparent);
+  background:
+    radial-gradient(circle at 0% 0%, color-mix(in oklab, var(--tldr-color) 16%, transparent) 0%, transparent 60%),
+    linear-gradient(135deg, color-mix(in oklab, var(--tldr-color) 12%, transparent) 0%, color-mix(in oklab, var(--tldr-color-2) 5%, transparent) 100%);
+}
+.dark .prose-chat .tldr-good { --tldr-color: oklch(0.78 0.18 150); --tldr-color-2: oklch(0.78 0.18 170); }
+
+/* WARN — amber */
+.prose-chat .tldr-warn {
+  --tldr-color: oklch(0.6 0.18 65);
+  --tldr-color-2: oklch(0.6 0.18 50);
+  border-color: color-mix(in oklab, var(--tldr-color) 42%, transparent);
+  background:
+    radial-gradient(circle at 0% 0%, color-mix(in oklab, var(--tldr-color) 18%, transparent) 0%, transparent 60%),
+    linear-gradient(135deg, color-mix(in oklab, var(--tldr-color) 14%, transparent) 0%, color-mix(in oklab, var(--tldr-color-2) 6%, transparent) 100%);
+}
+.dark .prose-chat .tldr-warn { --tldr-color: oklch(0.82 0.16 75); --tldr-color-2: oklch(0.78 0.16 60); }
+
+/* BAD — rose/red */
+.prose-chat .tldr-bad {
+  --tldr-color: oklch(0.58 0.22 22);
+  --tldr-color-2: oklch(0.6 0.22 5);
+  border-color: color-mix(in oklab, var(--tldr-color) 42%, transparent);
+  background:
+    radial-gradient(circle at 0% 0%, color-mix(in oklab, var(--tldr-color) 16%, transparent) 0%, transparent 60%),
+    linear-gradient(135deg, color-mix(in oklab, var(--tldr-color) 12%, transparent) 0%, color-mix(in oklab, var(--tldr-color-2) 6%, transparent) 100%);
+}
+.dark .prose-chat .tldr-bad { --tldr-color: oklch(0.78 0.18 22); --tldr-color-2: oklch(0.8 0.18 8); }
+
+/* UNKNOWN — neutral */
+.prose-chat .tldr-unknown {
+  --tldr-color: var(--muted-foreground);
+  --tldr-color-2: var(--muted-foreground);
+  border-color: var(--border);
+  background: linear-gradient(135deg, color-mix(in oklab, var(--muted) 60%, transparent), transparent);
+}
+
+/* Apply the variant color to the rail, icon chip, and TL;DR badge */
+.prose-chat .tldr-card:not(.tldr-info)::before {
+  background: linear-gradient(180deg, var(--tldr-color), var(--tldr-color-2));
+}
+.prose-chat .tldr-card:not(.tldr-info) .tldr-icon {
+  background: linear-gradient(135deg, var(--tldr-color), var(--tldr-color-2));
+}
+.prose-chat .tldr-card:not(.tldr-info) .tldr-body strong:first-child {
+  color: var(--tldr-color);
+  background: color-mix(in oklab, var(--tldr-color) 14%, transparent);
+  border-color: color-mix(in oklab, var(--tldr-color) 28%, transparent);
+}
+
+/* ============================================
+   CALLOUT BOX — labeled blockquote (Verdict / Say it like / Action / etc.)
+   Each variant defines its own --co-color and gets a distinct visual shape.
+   ============================================ */
+.prose-chat .callout {
+  --co-color: var(--primary);
+  --co-color-2: var(--gradient-mid);
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  margin-top: 0.85rem;
+  padding: 0.7rem 0.95rem 0.7rem 0.8rem;
+  border-radius: 0.7rem;
+  border: 1px solid color-mix(in oklab, var(--co-color) 28%, transparent);
+  background:
+    radial-gradient(circle at 0% 0%, color-mix(in oklab, var(--co-color) 10%, transparent) 0%, transparent 50%),
+    linear-gradient(135deg, color-mix(in oklab, var(--co-color) 7%, transparent) 0%, transparent 80%);
+  position: relative;
+  font-size: 0.84rem;
+  line-height: 1.55;
+  color: var(--foreground);
+}
+
+.prose-chat .callout-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.55rem;
+  height: 1.55rem;
+  margin-top: 0.1rem;
+  border-radius: 9999px;
+  color: var(--primary-foreground);
+  background: linear-gradient(135deg, var(--co-color), var(--co-color-2));
+  box-shadow:
+    0 2px 6px -2px color-mix(in oklab, var(--co-color) 50%, transparent),
+    inset 0 1px 0 color-mix(in oklab, white 22%, transparent);
+}
+
+.prose-chat .callout-body {
+  flex: 1;
+  min-width: 0;
+  padding-top: 0.05rem;
+}
+.prose-chat .callout-body p { margin: 0; }
+
+/* The leading **LABEL:** becomes an uppercase chip badge */
+.prose-chat .callout-body strong:first-child {
+  display: inline-block;
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--co-color);
+  background: color-mix(in oklab, var(--co-color) 14%, transparent);
+  border: 1px solid color-mix(in oklab, var(--co-color) 28%, transparent);
+  padding: 0.22em 0.55em;
+  border-radius: 0.4em;
+  margin-right: 0.55em;
+  vertical-align: 1px;
+  line-height: 1.2;
+}
+
+/* ----- Variants — each picks its own color pair ----- */
+.prose-chat .callout-action {
+  --co-color: var(--primary);
+  --co-color-2: var(--gradient-mid);
+}
+/* Action callouts get a subtle right-side arrow accent */
+.prose-chat .callout-action::after {
+  content: '→';
+  position: absolute;
+  right: 0.85rem;
+  bottom: 0.65rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: color-mix(in oklab, var(--co-color) 55%, transparent);
+  pointer-events: none;
+}
+
+.prose-chat .callout-speak {
+  --co-color: oklch(0.55 0.2 200);
+  --co-color-2: oklch(0.6 0.18 220);
+}
+.dark .prose-chat .callout-speak {
+  --co-color: oklch(0.78 0.16 200);
+  --co-color-2: oklch(0.78 0.14 220);
+}
+/* Speak callouts get oversized quote marks as a watermark */
+.prose-chat .callout-speak::after {
+  content: '\201D';
+  position: absolute;
+  right: 0.55rem;
+  top: -0.45rem;
+  font-size: 3.2rem;
+  font-family: Georgia, 'Times New Roman', serif;
+  line-height: 1;
+  color: color-mix(in oklab, var(--co-color) 18%, transparent);
+  pointer-events: none;
+}
+
+.prose-chat .callout-matters {
+  --co-color: oklch(0.55 0.2 285);
+  --co-color-2: oklch(0.6 0.18 305);
+}
+.dark .prose-chat .callout-matters {
+  --co-color: oklch(0.78 0.18 285);
+  --co-color-2: oklch(0.78 0.16 305);
+}
+
+.prose-chat .callout-risk {
+  --co-color: oklch(0.6 0.22 30);
+  --co-color-2: oklch(0.6 0.22 15);
+}
+.dark .prose-chat .callout-risk {
+  --co-color: oklch(0.8 0.18 30);
+  --co-color-2: oklch(0.78 0.18 15);
+}
+
+.prose-chat .callout-verdict-good {
+  --co-color: oklch(0.55 0.2 150);
+  --co-color-2: oklch(0.62 0.18 165);
+}
+.dark .prose-chat .callout-verdict-good {
+  --co-color: oklch(0.78 0.18 150);
+  --co-color-2: oklch(0.78 0.18 170);
+}
+
+.prose-chat .callout-verdict-warn {
+  --co-color: oklch(0.6 0.18 65);
+  --co-color-2: oklch(0.6 0.18 50);
+}
+.dark .prose-chat .callout-verdict-warn {
+  --co-color: oklch(0.82 0.16 75);
+  --co-color-2: oklch(0.78 0.16 60);
+}
+
+.prose-chat .callout-verdict-bad {
+  --co-color: oklch(0.58 0.22 22);
+  --co-color-2: oklch(0.6 0.22 5);
+}
+.dark .prose-chat .callout-verdict-bad {
+  --co-color: oklch(0.78 0.18 22);
+  --co-color-2: oklch(0.8 0.18 8);
+}
+
+.prose-chat .callout-verdict-unknown {
+  --co-color: var(--muted-foreground);
+  --co-color-2: var(--muted-foreground);
+  border-color: var(--border);
+  background: var(--muted);
+}
+.prose-chat .callout-verdict-unknown .callout-icon {
+  background: color-mix(in oklab, var(--muted-foreground) 22%, transparent);
+  color: var(--muted-foreground);
+  box-shadow: none;
+}
+
+.prose-chat .callout-plain {
+  --co-color: var(--foreground);
+  --co-color-2: var(--muted-foreground);
+  border-color: var(--border);
+  background: var(--card);
+}
+.prose-chat .callout-plain .callout-icon {
+  background: color-mix(in oklab, var(--muted-foreground) 18%, transparent);
+  color: var(--foreground);
+  box-shadow: none;
+}
+
+/* ============================================
+   CODE / LINKS / HR
+   ============================================ */
 .prose-chat pre {
-  margin: 0.6em 0;
-  padding: 0.75em 1em;
-  border-radius: 0.5em;
+  margin: 0.55em 0;
+  padding: 0.7em 0.95em;
+  border-radius: 0.55em;
   background: var(--muted);
   border: 1px solid var(--border);
   overflow-x: auto;
@@ -336,59 +728,22 @@
   font-size: 0.78em;
   font-weight: 400;
 }
-
-/* Blockquotes — accent-colored border */
-.prose-chat blockquote {
-  border-left: 3px solid var(--primary) / 40%;
-  padding-left: 0.75em;
-  margin: 0.6em 0;
-  color: var(--muted-foreground);
-  font-style: italic;
-}
-
-/* Links */
 .prose-chat a {
   color: var(--primary);
   text-decoration: underline;
   text-underline-offset: 2px;
   font-weight: 500;
 }
-.prose-chat a:hover {
-  opacity: 0.8;
-}
-
-/* Horizontal rule */
+.prose-chat a:hover { opacity: 0.8; }
 .prose-chat hr {
   border: none;
   border-top: 1px solid var(--border);
   margin: 0.8em 0;
 }
 
-/* Tables — striped with accent header */
-.prose-chat table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 0.6em 0;
-  font-size: 0.78em;
-  border-radius: 0.4em;
-  overflow: hidden;
-}
-.prose-chat th {
-  background: var(--primary) / 10%;
-  color: var(--primary);
-  font-weight: 600;
-  text-align: left;
-  padding: 0.4em 0.6em;
-  border: 1px solid var(--border);
-}
-.prose-chat td {
-  border: 1px solid var(--border);
-  padding: 0.35em 0.6em;
-  text-align: left;
-}
-.prose-chat tr:nth-child(even) td {
-  background: var(--muted) / 50%;
-}
+/* Tables are forbidden by the prompt and suppressed in the renderer.
+   Hide any that slip through as a defensive measure. */
+.prose-chat table { display: none; }
 
 /* ============================================
    CARD HOVER GLOW (suggestion cards)

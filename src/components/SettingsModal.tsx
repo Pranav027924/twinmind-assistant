@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { RotateCcw, Key, SlidersHorizontal, FileText } from 'lucide-react';
+import { RotateCcw, Key, SlidersHorizontal, FileText, Briefcase } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import type { AppSettings } from '@/types';
+import type { AppSettings, MeetingType } from '@/types';
 import { DEFAULT_SETTINGS } from '@/lib/constants';
 
 interface SettingsModalProps {
@@ -24,10 +24,34 @@ interface SettingsModalProps {
   onClose: () => void;
 }
 
-export default function SettingsModal({ open, settings, onSave, onClose }: SettingsModalProps) {
+const MEETING_TYPES: { value: MeetingType; label: string }[] = [
+  { value: 'auto', label: 'Auto-detect' },
+  { value: 'sales_call', label: 'Sales call' },
+  { value: 'pitch', label: 'Investor pitch' },
+  { value: 'sprint_planning', label: 'Sprint planning' },
+  { value: 'interview', label: 'Interview / hiring' },
+  { value: 'one_on_one', label: '1:1 / check-in' },
+  { value: 'brainstorm', label: 'Brainstorm' },
+  { value: 'support', label: 'Support call' },
+  { value: 'generic', label: 'Generic meeting' },
+];
+
+export default function SettingsModal(props: SettingsModalProps) {
+  // When closed, the Dialog still renders but we re-mount the form on each
+  // open by keying on the settings snapshot. This avoids effect-driven syncing
+  // and ensures the draft starts fresh whenever the user opens the modal.
+  return (
+    <SettingsModalForm
+      key={props.open ? `o-${props.settings.groqApiKey.length}-${props.settings.meetingType}` : 'closed'}
+      {...props}
+    />
+  );
+}
+
+function SettingsModalForm({ open, settings, onSave, onClose }: SettingsModalProps) {
   const [draft, setDraft] = useState<AppSettings>(settings);
 
-  const update = (key: keyof AppSettings, value: string | number) => {
+  const update = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
     setDraft((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -58,12 +82,12 @@ export default function SettingsModal({ open, settings, onSave, onClose }: Setti
             Settings
           </DialogTitle>
           <DialogDescription>
-            Configure your Groq API key, prompts, and context windows.
+            Configure your Groq API key, meeting context, prompts, and context windows.
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto space-y-6 py-2 pr-1">
-          {/* API Key Section */}
+          {/* API Key */}
           <div className="rounded-xl border bg-card p-4 space-y-3">
             <div className="flex items-center gap-2 text-sm font-medium">
               <Key className="size-3.5 text-primary" />
@@ -92,13 +116,70 @@ export default function SettingsModal({ open, settings, onSave, onClose }: Setti
             </div>
           </div>
 
-          {/* Parameters Section */}
+          {/* Meeting Context */}
+          <div className="rounded-xl border bg-card p-4 space-y-3">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <Briefcase className="size-3.5 text-primary" />
+              Meeting Context
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Telling the copilot what kind of meeting this is and your role dramatically
+              improves suggestion quality.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="meeting-type" className="text-[11px] text-muted-foreground">
+                  Meeting type
+                </Label>
+                <select
+                  id="meeting-type"
+                  value={draft.meetingType}
+                  onChange={(e) => update('meetingType', e.target.value as MeetingType)}
+                  className="w-full h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {MEETING_TYPES.map((m) => (
+                    <option key={m.value} value={m.value}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="user-role" className="text-[11px] text-muted-foreground">
+                  Your role in this meeting
+                </Label>
+                <Input
+                  id="user-role"
+                  type="text"
+                  value={draft.userRole}
+                  onChange={(e) => update('userRole', e.target.value)}
+                  placeholder="e.g. Founder pitching, Hiring manager, AE"
+                  className="h-8 text-sm"
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="meeting-goal" className="text-[11px] text-muted-foreground">
+                Goal for this meeting (one line, optional)
+              </Label>
+              <Input
+                id="meeting-goal"
+                type="text"
+                value={draft.meetingGoal}
+                onChange={(e) => update('meetingGoal', e.target.value)}
+                placeholder="e.g. Close a $200K deal, decide on Q2 roadmap"
+                className="h-8 text-sm"
+              />
+            </div>
+          </div>
+
+          {/* Parameters */}
           <div className="rounded-xl border bg-card p-4 space-y-3">
             <div className="flex items-center gap-2 text-sm font-medium">
               <SlidersHorizontal className="size-3.5 text-primary" />
               Parameters
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="suggestion-ctx" className="text-[11px] text-muted-foreground">
                   Suggestion context
@@ -112,7 +193,7 @@ export default function SettingsModal({ open, settings, onSave, onClose }: Setti
                   onChange={(e) => update('suggestionContextChunks', parseInt(e.target.value) || 6)}
                   className="h-8 text-sm"
                 />
-                <p className="text-[10px] text-muted-foreground/60">chunks (30s each)</p>
+                <p className="text-[10px] text-muted-foreground/60">chunks (~30s each)</p>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="answer-ctx" className="text-[11px] text-muted-foreground">
@@ -151,14 +232,19 @@ export default function SettingsModal({ open, settings, onSave, onClose }: Setti
             </div>
           </div>
 
-          {/* Prompts Section */}
+          {/* Prompts */}
           <div className="rounded-xl border bg-card p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-sm font-medium">
                 <FileText className="size-3.5 text-primary" />
                 Prompts
               </div>
-              <Button variant="ghost" size="sm" onClick={resetPrompts} className="gap-1.5 text-[11px] h-7">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={resetPrompts}
+                className="gap-1.5 text-[11px] h-7"
+              >
                 <RotateCcw className="size-3" />
                 Reset defaults
               </Button>

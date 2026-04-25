@@ -4,11 +4,22 @@ export interface TranscriptChunk {
   timestamp: number;
 }
 
+export type SuggestionType =
+  | 'question_to_ask'
+  | 'talking_point'
+  | 'answer'
+  | 'fact_check'
+  | 'clarification';
+
+export type FactCheckConfidence = 'verified' | 'likely' | 'unverified';
+
 export interface Suggestion {
   id: string;
-  type: 'question_to_ask' | 'talking_point' | 'answer' | 'fact_check' | 'clarification';
+  type: SuggestionType;
   title: string;
   preview: string;
+  triggerQuote?: string;
+  confidence?: FactCheckConfidence;
 }
 
 export interface SuggestionBatch {
@@ -23,7 +34,24 @@ export interface ChatMessage {
   content: string;
   timestamp: number;
   isStreaming?: boolean;
+  // Track which suggestion (if any) triggered this assistant message
+  sourceSuggestion?: {
+    type: SuggestionType;
+    title: string;
+    triggerQuote?: string;
+  };
 }
+
+export type MeetingType =
+  | 'auto'
+  | 'sales_call'
+  | 'pitch'
+  | 'sprint_planning'
+  | 'interview'
+  | 'one_on_one'
+  | 'brainstorm'
+  | 'support'
+  | 'generic';
 
 export interface AppSettings {
   groqApiKey: string;
@@ -33,4 +61,13 @@ export interface AppSettings {
   suggestionContextChunks: number;
   detailedAnswerContextChunks: number;
   refreshIntervalSeconds: number;
+  meetingType: MeetingType;
+  userRole: string;
+  meetingGoal: string;
+}
+
+export interface LatencySample {
+  label: 'transcribe' | 'suggestions' | 'chat_ttft' | 'chat_total';
+  durationMs: number;
+  timestamp: number;
 }

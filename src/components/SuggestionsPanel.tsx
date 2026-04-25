@@ -15,6 +15,7 @@ interface SuggestionsPanelProps {
   onSuggestionClick: (suggestion: Suggestion) => void;
   onRefresh: () => void;
   isRecording: boolean;
+  hasTranscript?: boolean;
 }
 
 function formatTime(ts: number): string {
@@ -26,7 +27,7 @@ export default function SuggestionsPanel({
   isLoading,
   onSuggestionClick,
   onRefresh,
-  isRecording,
+  hasTranscript = false,
 }: SuggestionsPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -54,7 +55,8 @@ export default function SuggestionsPanel({
           variant="ghost"
           size="sm"
           onClick={onRefresh}
-          disabled={isLoading || !isRecording}
+          disabled={isLoading}
+          title="Refresh suggestions (R)"
           className="gap-1.5 text-xs"
         >
           <RefreshCw className={`size-3 ${isLoading ? 'animate-spin' : ''}`} />
@@ -97,7 +99,9 @@ export default function SuggestionsPanel({
             <div className="space-y-1">
               <p className="text-sm font-medium text-muted-foreground">No suggestions yet</p>
               <p className="text-xs text-muted-foreground/60">
-                Suggestions appear automatically while recording
+                {hasTranscript
+                  ? 'Press Refresh or wait for the next 30s cycle'
+                  : 'Suggestions appear automatically while recording'}
               </p>
             </div>
           </div>
